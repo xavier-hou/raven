@@ -157,6 +157,7 @@ func (c *EngineController) sync() error {
 		}
 		c.syncNodeInfo(gw.Status.Nodes)
 	}
+
 	for _, gw := range gws {
 		if !c.shouldHandleGateway(gw) {
 			continue
@@ -246,6 +247,10 @@ func (c *EngineController) handleEventErr(err error, event interface{}) {
 	c.queue.Forget(event)
 }
 
+// hxc raven agent 处理该gateway的前提是
+// 1. 该gateway有active endpoint
+// 2. 该gateway的active endpoint存在public
+// 3. 否则等待raven controller或者下一轮的处理
 func (c *EngineController) shouldHandleGateway(gateway *v1alpha1.Gateway) bool {
 	if gateway.Status.ActiveEndpoint == nil {
 		klog.InfoS("no active endpoint , waiting for sync", "gateway", klog.KObj(gateway))
@@ -262,17 +267,20 @@ func (c *EngineController) configGatewayPublicIP(gateway *v1alpha1.Gateway) erro
 	if gateway.Status.ActiveEndpoint.NodeName != c.nodeName {
 		return nil
 	}
+	// hxc 如果该gw是当前gw的话，获取当前gateway的节点的公网ip，也就是当前gateway active endpoint的公网ip
 	publicIP, err := utils.GetPublicIP()
 	if err != nil {
 		return err
 	}
 	// retry to update public ip of localGateway
+	// hxc retry.RetryOnConflict的作用是啥？
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// get localGateway from api server
 		apiGw, err := c.ravenClient.RavenV1alpha1().Gateways().Get(context.Background(), gateway.Name, v1.GetOptions{})
 		if err != nil {
 			return err
 		}
+		// hxc 如果一个node 对应多个endpoint呢？
 		for k, v := range apiGw.Spec.Endpoints {
 			if v.NodeName == c.nodeName {
 				apiGw.Spec.Endpoints[k].PublicIP = publicIP

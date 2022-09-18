@@ -18,4 +18,5 @@ secretGenerator:
 
 configMapGenerator:
   - name: agent-config
-    env: config.env
+    envs:
+    - config.env

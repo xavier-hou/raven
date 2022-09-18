@@ -24,6 +24,7 @@ type AgentOptions struct {
 }
 
 // Validate validates the AgentOptions
+// hxc 仅设置nodename
 func (o *AgentOptions) Validate() error {
 	if o.NodeName == "" {
 		o.NodeName = os.Getenv("NODE_NAME")
